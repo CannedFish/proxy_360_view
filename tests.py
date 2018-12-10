@@ -10,7 +10,7 @@ LOG = logging.getLogger(__name__)
 
 class Proxy360TestCase(TestCase):
     def setUp(self):
-        self.url = 'http://localhost:9000'
+        self.url = 'http://localhost:9000/identity'
         self.catalog = {}
         self.token = ''
 

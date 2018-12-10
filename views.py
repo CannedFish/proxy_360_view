@@ -66,8 +66,8 @@ def proxy(req, url, *args, **kw):
 
 catalog = {}
 
-class TokenView(APIView):
-    def post(self, req):
+class IdentityView(APIView):
+    def _create_auth_tokens(self, req):
         res = proxy(req, settings.PROXY_360_AUTH_URL+req.META['PATH_INFO'])
         if res is None:
             return HttpResponse('Error occured!', status=500)
@@ -97,31 +97,19 @@ class TokenView(APIView):
             LOG.error(e)
             return HttpResponse(e, status=500)
 
-class NormalIdentityView(APIView):
-    def _proxy(self, req, *args, **kw):
+    def get(self, req, *args, **kw):
         res = proxy(req, settings.PROXY_360_AUTH_URL+req.META['PATH_INFO'])
         return HttpResponse(res.text
                 , status=res.status_code
                 , content_type=res.headers.get('Content-Type'))
 
-class DomainView(NormalIdentityView):
-    def get(self, req):
-        return self._proxy(req)
-
-class UserView(NormalIdentityView):
-    def get(self, req):
-        return self._proxy(req)
-
-class ProjectView(NormalIdentityView):
-    def get(self, req):
-        return self._proxy(req)
-
-class RoleAssignView(NormalIdentityView):
-    def get(self, req):
-        return self._proxy(req)
+    def post(self, req, *args, **kw):
+        if req.META['PATH_INFO'].endswith('/auth/tokens'):
+            return self._create_auth_tokens(req)
+        return HttpResponse('Not Implemented', status=501)
 
 class ComputeView(APIView):
-    def _proxy(self, req, tenant_id, *args, **kw):
+    def get(self, req, *args, **kw):
         host = catalog['nova']['endpoints'][0]['host']
         for ep in catalog['nova']['endpoints'][1:]:
             if ep['interface'] == 'internal':
@@ -130,12 +118,4 @@ class ComputeView(APIView):
         return HttpResponse(res.text
                 , status=res.status_code
                 , content_type=res.headers.get('Content-Type'))
-
-class ServerView(ComputeView):
-    def get(self, req, tenant_id):
-        return self._proxy(req, tenant_id)
-
-class ServerDetailView(ComputeView):
-    def get(self, req, tenant_id):
-        return self._proxy(req, tenant_id)
 
