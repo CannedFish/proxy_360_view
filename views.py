@@ -64,9 +64,27 @@ def proxy(req, url, *args, **kw):
         LOG.error(e)
         return None
 
+class ProxyView(APIView):
+    def _get_base_url(self):
+        raise NotImplementedError('Must be implemented in child')
+
+    def _proxy(self, req, *args, **kw):
+        res = proxy(req, self._get_base_url()+req.META['PATH_INFO'])
+        rsp = HttpResponse(res.text
+                , status=res.status_code
+                , content_type=res.headers.get('Content-Type'))
+        rsp['x-openstack-request-id'] = res.headers.get('x-openstack-request-id')
+        return rsp
+
+    def get(self, req, *args, **kw):
+        return self._proxy(req, *args, **kw)
+
+    def post(self, req, *args, **kw):
+        return self._proxy(req, *args, **kw)
+
 catalog = {}
 
-class IdentityView(APIView):
+class IdentityView(ProxyView):
     def _create_auth_tokens(self, req):
         res = proxy(req, settings.PROXY_360_AUTH_URL+req.META['PATH_INFO'])
         if res is None:
@@ -97,25 +115,19 @@ class IdentityView(APIView):
             LOG.error(e)
             return HttpResponse(e, status=500)
 
-    def get(self, req, *args, **kw):
-        res = proxy(req, settings.PROXY_360_AUTH_URL+req.META['PATH_INFO'])
-        return HttpResponse(res.text
-                , status=res.status_code
-                , content_type=res.headers.get('Content-Type'))
+    def _get_base_url(self):
+        return settings.PROXY_360_AUTH_URL
 
     def post(self, req, *args, **kw):
         if req.META['PATH_INFO'].endswith('/auth/tokens'):
             return self._create_auth_tokens(req)
-        return HttpResponse('Not Implemented', status=501)
+        return super(IdentityView, self).post(req, *args, **kw)
 
-class ComputeView(APIView):
-    def get(self, req, *args, **kw):
+class ComputeView(ProxyView):
+    def _get_base_url(self):
         host = catalog['nova']['endpoints'][0]['host']
         for ep in catalog['nova']['endpoints'][1:]:
             if ep['interface'] == 'internal':
                 host = ep['host']
-        res = proxy(req, host+req.META['PATH_INFO'])
-        return HttpResponse(res.text
-                , status=res.status_code
-                , content_type=res.headers.get('Content-Type'))
+        return host
 
